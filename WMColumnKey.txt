@@ -1,0 +1,25 @@
+WMShapes Onsets
+WMShapes1: WMSprep.OnsetTime (OQ) - TriggerWAIT.RTTime[Block] (X)
+WMShapes2: WMSprep2.OnsetTime (QG) - TriggerWAIT.RTTime[Block] (X)
+
+WMShapes Offsets
+low: WMSprep.OnsetTime (OQ)
+high: WMSprep.OnsetTime (OQ)
+low2: WMSprep2.OnsetTime (QG)
+high2: WMSprep2.OnsetTime2 (QG)
+ITI1: WMSfixation.OnsetTime (HB)
+WMSITI2: WMSfixation2.OnsetTime (HN)
+WMSimpsonsITIBlock: SimpsonsITI4aOnsetTime (HW)
+
+WMFaces Onsets:
+WMFaces1: prep.OnsetTime (SI) - TriggerWAIT.RTTime[Block] (X)
+WMFaces2: prep2.OnsetTime (TY) - TriggerWAIT.RTTime[Block] (X)
+
+WMFaces Offsets
+angry: prep.OnsetTime (SI)
+calm: prep.OnsetTime (SI)
+angry2: prep2.OnsetTime (TY)
+calm2: prep2.OnsetTime (TY)
+WMFSimpsonsITIBlock: SimpsonsITI5aOnsetTime (JY)
+ITI: fixationOnsetTime (JM)
+ITI2: fixation2OnsetTime (KZ)
