@@ -10,6 +10,7 @@ import argparse
 import csv
 import os
 import re
+import glob
 
 #Pull the data in based on a parameter entered at the command line
 parser = argparse.ArgumentParser()
@@ -244,6 +245,7 @@ def TROutput (Condition, runData, BlockOnsets, BlockDurations):
 
 def ParseGoNoGo (data, runData):
     
+    AllEVData = pd.DataFrame()
     for NumItems in ['Two','Three','Four']:
         GNGType = NumItems + 'GoProc'
 
@@ -263,43 +265,38 @@ def ParseGoNoGo (data, runData):
 
                 TrialOnsets = (Trials['GNGCueOnsetTime'] - TriggerOnsetTimes) / float(1000)
                 TrialDurations = Trials['GNGCueOnsetToOnsetTime'] / float(1000)
-                
-                GNGOutput(str(NumItems + '_' + Condition + '_' + RespType), runData, TrialOnsets, TrialDurations)
-        
-    #Combine files for inaccurate go trials (across GNGTypes)
-    GNG = data[(data['ProcedureBlock'] == runData['RunName']) & (data['ConditionLogLevel5'] == 'Go') & (data['GNGACC'] == 0)]
-    TrialOnsets = (GNG['GNGCueOnsetTime'] - GNG['TriggerWAITRTTimeTrial']) / float(1000)
-    TrialDurations = GNG['GNGCueOnsetToOnsetTime'] / float(1000)
-    GNGOutput('ALL_Go_Incorrect', runData, TrialOnsets, TrialDurations)
+
+                EVType = str(NumItems) + '_' + str(Condition) + '_' + str(RespType)
+
+                if ('Four_NoGo' in EVType):
+                	Amplitude = 3
+                elif ('Three_NoGo' in EVType):
+                	Amplitude = 2
+                else:
+                	Amplitude = 1
+
+                EVData = pd.concat([TrialOnsets, TrialDurations], ignore_index = True, axis = 1)
+                EVData['Amplitude'] = Amplitude
+                EVData['EVType'] = str(Condition) + '_' + str(RespType)
+
+                AllEVData = pd.concat([AllEVData, EVData], ignore_index = True)
+    
+    #print AllEVData
+    AllEVData = AllEVData.rename(columns={0: 'Onset', 1: 'Duration'})
+    AllEVData.sort_values('Onset', ascending = True, inplace = True)
+
+    for EVType in ['Go_Correct','NoGo_Correct','Go_Incorrect','NoGo_Incorrect']:
+    	EVData = AllEVData[AllEVData['EVType'] == str(EVType)][['Onset','Duration','Amplitude']]
+    	if (not EVData.empty):
+    		OutName = runData['FullTaskDir'] + '_ALL_' + str(EVType) + '.txt'
+    		EVData = EVData.to_csv(OutName, sep = '\t', index = False, header = False)
+    	else:
+    		OutName = runData['FullTaskDir'] + '_ALL_' + str(EVType) + '-EMPTY.txt'
+    		Touch(OutName)
+    #Subset = AllEVData[(AllEVData['EVType'] == EV)]
+
 
 def GNGOutput (Condition, runData, BlockOnsets, BlockDurations):
-    OutName = str(runData['FullTaskDir'] + '_' + Condition + '.txt')
-    print str(OutName)
-
-    if (not BlockOnsets.empty):
-	    OutputFile = open(OutName, "w")
-	    writer = csv.writer(OutputFile, delimiter=' ')
-	    
-	    #NoGo trials have different amplitude, so we set that here
-	    if ('Four_NoGo' in Condition):
-	    	Amplitude = 3
-	    elif ('Three_NoGo' in Condition):
-	    	Amplitude = 2
-	    else:
-	    	Amplitude = 1
-
-	    for row in range(0,len(BlockOnsets)):
-	    	print str(BlockOnsets.iloc[row]) + '\t' + str(BlockDurations.iloc[row]) + '\t' + str(Amplitude)
-	    	writer.writerow([str(BlockOnsets.iloc[row]), str(BlockDurations.iloc[row]), str(Amplitude)])
-	    OutputFile.close()
-
-
-    #We print an empty EV file here (suffix -EMPTY.txt) to represent any condition where there are no trials
-    #This empty file naming convention is used later in preprocessing pipeline (FEAT *hates* empty EVs, so nice to know ahead of time)
-    else:
-        OutName = str(os.path.dirname(OutName) + '/' + os.path.basename(OutName).split('.txt')[0] + '-EMPTY.txt')
-        Touch(OutName)
-    print '\n'
 
     if (Condition == 'ALL_Go_Incorrect'):
         a = []
@@ -318,6 +315,29 @@ def GNGOutput (Condition, runData, BlockOnsets, BlockDurations):
 	        writer.writerow([str(i)])
 	    OutputFile.close()
 	    print '\n'
+
+    else:
+		OutName = str(runData['FullTaskDir'] + '_' + Condition + '.txt')
+		print str(OutName)
+
+		#if (not BlockOnsets.empty):
+		OutputFile = open(OutName, "w")
+		writer = csv.writer(OutputFile, delimiter=' ')
+
+		for row in range(0,len(BlockOnsets)):
+			print str(BlockOnsets.iloc[row]) + '\t' + str(BlockDurations.iloc[row]) + '\t' + str(Amplitude)
+			writer.writerow([str(BlockOnsets.iloc[row]), str(BlockDurations.iloc[row]), str(Amplitude)])
+		OutputFile.close()
+
+
+	    #We print an empty EV file here (suffix -EMPTY.txt) to represent any condition where there are no trials
+	    #This empty file naming convention is used later in preprocessing pipeline (FEAT *hates* empty EVs, so nice to know ahead of time)
+	    #else:
+	    #    OutName = str(os.path.dirname(OutName) + '/' + os.path.basename(OutName).split('.txt')[0] + '-EMPTY.txt')
+	    #    Touch(OutName)
+	    #print '\n'
+
+
 
 #for runname in ['GNG1','GNG2','GNG3']:
 #    runData = GetRunData(runname)
