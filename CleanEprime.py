@@ -18,40 +18,42 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', '-i', required=True, help='Name of reformatted eprime file')
 args = parser.parse_args()
 infile = args.input
-#infile = '/mnt/stressdevlab/dep_threat_pipeline/999/behavior/999_reformatted_eprime.csv'
-
-#Remove bad characters from header names ([,],.)
-hdr = pd.read_csv(infile, sep = '\t', nrows = 1)
-hdr.rename(columns=lambda x: re.sub('[\[\].]','',x), inplace=True)
-
-#Get rest of the datafile with cleanheader
-data = pd.read_csv(infile, sep = '\t', skiprows = [0], names = hdr, low_memory = False)
+subject = str(os.path.basename(infile).split('_')[0])
 
 #Change ProcedureBlock values, so that GNGRun2and3 is split correctly into GNGRun2 and GNGRun3
-data.loc[data['Block'] == 8, 'ProcedureBlock'] = 'GNGRun2'
-data.loc[data['Block'] == 9, 'ProcedureBlock'] = 'GNGRun3'
+def SplitGNGRuns(data):
 
-print data[(data['ProcedureBlock'] == 'GNGRun2')].shape
-print data[(data['ProcedureBlock'] == 'GNGRun3')].shape
+    data.loc[data['Block'] == 8, 'ProcedureBlock'] = 'GNGRun2'
+    data.loc[data['Block'] == 9, 'ProcedureBlock'] = 'GNGRun3'
+
+    #Check shape of GNGRun2 and GNGRun3 to confirm this is correct
+    #print data[(data['ProcedureBlock'] == 'GNGRun2')].shape
+    #print data[(data['ProcedureBlock'] == 'GNGRun3')].shape
+
+    return data
+
 
 #Recode accuracy for GNG trials
+def RecodeGNGAcc(data):
+    #Go trials
+    data.loc[(data['Condition'] == 'Go') & (data['GNGCueRT'] > 0), 'GNGCueACC'] = 1
+    data.loc[(data['Condition'] == 'Go') & (data['GNGCueRT'] == 0), 'GNGCueACC'] = 0
+    data.loc[(data['Condition'] == 'Go') & (data['JitteredITIRT'] > 0), 'JitteredITIACC'] = 1
+    data.loc[(data['Condition'] == 'Go') & (data['JitteredITIRT'] == 0), 'JitteredITIACC'] = 0
 
-#Go trials
-data.loc[(data['ConditionLogLevel5'] == 'Go') & (data['GNGCueRT'] > 0), 'GNGCueACC'] = 1
-data.loc[(data['ConditionLogLevel5'] == 'Go') & (data['GNGCueRT'] == 0), 'GNGCueACC'] = 0
-data.loc[(data['ConditionLogLevel5'] == 'Go') & (data['JitteredITIRT'] > 0), 'JitteredITIACC'] = 1
-data.loc[(data['ConditionLogLevel5'] == 'Go') & (data['JitteredITIRT'] == 0), 'JitteredITIACC'] = 0
+    #NoGo trials
+    data.loc[(data['Condition'] == 'NoGo') & (data['GNGCueRT'] > 0), 'GNGCueACC'] = 0
+    data.loc[(data['Condition'] == 'NoGo') & (data['GNGCueRT'] == 0), 'GNGCueACC'] = 1
+    data.loc[(data['Condition'] == 'NoGo') & (data['JitteredITIRT'] > 0), 'JitteredITIACC'] = 0
+    data.loc[(data['Condition'] == 'NoGo') & (data['JitteredITIRT'] == 0), 'JitteredITIACC'] = 1
 
-#NoGo trials
-data.loc[(data['ConditionLogLevel5'] == 'NoGo') & (data['GNGCueRT'] > 0), 'GNGCueACC'] = 0
-data.loc[(data['ConditionLogLevel5'] == 'NoGo') & (data['GNGCueRT'] == 0), 'GNGCueACC'] = 1
-data.loc[(data['ConditionLogLevel5'] == 'NoGo') & (data['JitteredITIRT'] > 0), 'JitteredITIACC'] = 0
-data.loc[(data['ConditionLogLevel5'] == 'NoGo') & (data['JitteredITIRT'] == 0), 'JitteredITIACC'] = 1
+    #GNGCueACC + JitteredITIACC should be > 0 for accurate trials (GNGACC = 1)
+    data['GNGCombinedACC'] = data['GNGCueACC'] + data['JitteredITIACC']
+    data.loc[(data['GNGCombinedACC'] > 0), 'GNGACC'] = 1
+    data.loc[(data['GNGCombinedACC'] == 0), 'GNGACC'] = 0
 
-#GNGCueACC + JitteredITIACC should be > 0 for accurate trials (GNGACC = 1)
-data['GNGCombinedACC'] = data['GNGCueACC'] + data['JitteredITIACC']
-data.loc[(data['GNGCombinedACC'] > 0), 'GNGACC'] = 1
-data.loc[(data['GNGCombinedACC'] == 0), 'GNGACC'] = 0
+    return data
+
 
 #This function renames column so that name structure follows pattern : ColNameRunNum
 def RenameColumnToMatchPattern (origName):
@@ -60,12 +62,50 @@ def RenameColumnToMatchPattern (origName):
     newName = loc[0] + loc[1] + str(RunNum)
     return newName
 
+print subject
+
+cleaneprime = infile.replace('_reformatted_','_clean_')
+eprimetype = str(subject)
+
+#Remove bad characters from header names ([,],.)
+hdr = pd.read_csv(infile, sep = '\t', nrows = 0)
+hdr.rename(columns=lambda x: re.sub('[\[\].]','',x), inplace=True)
+#hdr.to_csv(cleancolfile)
+
+#Check if new or old version of experiment
+if 'ConditionLogLevel5' in hdr:
+    eprimetype += str(',YES-ConditionLogLevel5')
+    if 'Condition' not in hdr:
+        hdr.rename(columns={'ConditionLogLevel5': 'Condition'}, inplace=True)
+    else:
+        print str("ERROR: Conflicting file names (can not renname ConditionLogLevel5 to Condition if condition col already exists!")
+else:
+    eprimetype += str(',NO-ConditionLogLevel5')
+
+#Get rest of the datafile with cleanheader
+data = pd.read_csv(infile, sep = '\t', skiprows = [0], names = hdr, low_memory = False)
+
+if 'GNGRun2and3' in data['ProcedureBlock'].unique():
+    eprimetype += str(',YES-GNGRun2and3')
+    data = SplitGNGRuns(data)
+else:
+    eprimetype += str(',NO-GNGRun2and3')
+
+if 'FearLearningTask' in data['ProcedureBlock'].unique():
+    eprimetype += str(',YES-FearLearningTask')
+else:
+    eprimetype += str(',NO-FearLearningTask')
+
+#Recode GNGACC
+data = RecodeGNGAcc(data)
+
 #Rename a few column names to make pattern-matching more straight-forward
 for prefix in ['prep2', 'probe2', 'ReactivityITI2', 'CSImageRecall2', 'RecallITI2', 'Threat2', 'ThreatResp2']:
     for cName in data.filter(like=str(prefix)).columns.values:
         newName = RenameColumnToMatchPattern(cName)
         data.rename(columns = {str(cName):str(newName)}, inplace = True)
-        
-#Write to file
-outfile = os.path.dirname(infile) + '/' + os.path.basename(infile).split('_')[0] + '_clean_eprime.csv'
-data.to_csv(outfile, sep=',')
+
+
+#Write to file (finally!)
+#outfile = os.path.dirname(infile) + '/' + os.path.basename(infile).split('_')[0] + '_clean_eprime.csv'
+data.to_csv(cleaneprime, sep=',')

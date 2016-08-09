@@ -234,8 +234,8 @@ def TROutput (Condition, runData, BlockOnsets, BlockDurations):
 # | Condition 1 | ProcedureSubTrial = 'TwoGoProc' | 
 # | Condition 2 | ProcedureSubTrial = 'ThreeGoProc' |
 # | Condition 3 | ProcedureSubTrial = 'FourGoProc' |
-# | Sub-Condition A | ConditionLogLevel5 = 'Go' |
-# | Sub-Condition B | ConditionLogLevel5 = 'NoGo' |
+# | Sub-Condition A | Condition = 'Go' |
+# | Sub-Condition B | Condition = 'NoGo' |
 # | RespType A | Incorrect (GNGACC = 0) |
 # | RespType B | Correct (GNGACC = 1) | 
 # | OnsetTime | Subtrials that match each Condition, Sub-Condition, and RespType (as defined above) | GNGCueOnsetTime
@@ -260,7 +260,7 @@ def ParseGoNoGo (data, runData):
                     RespType = 'In' + RespType.lower()
 
                 #print 'RespType: ' + str(RespType)
-                Trials = GNG[(GNG['ConditionLogLevel5'] == str(Condition)) & (GNG['GNGACC'] == int(Accuracy))]
+                Trials = GNG[(GNG['Condition'] == str(Condition)) & (GNG['GNGACC'] == int(Accuracy))]
                 TriggerOnsetTimes = Trials.TriggerWAITRTTimeTrial
 
                 TrialOnsets = (Trials['GNGCueOnsetTime'] - TriggerOnsetTimes) / float(1000)
